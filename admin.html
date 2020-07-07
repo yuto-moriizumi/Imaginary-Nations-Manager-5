@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>架空国家第五世界線</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body style="margin: 0px !important;">
+    <img id="map" style="display:none;">
+    <script>
+        var map = document.getElementById("map");
+        map.src = "map.png?=" + Math.random();
+    </script>
+    <img id="flag" src="flags/NotCountry.png" style="display:none;" width="320px">
+    <canvas id="myCanvas" width="1000px" height="500px"></canvas>
+    <div id="countryNames"></div>
+    <form style="float: left;">
+        <table>
+            <tr>
+                <th>現在の日時</th>
+                <td><span id="year"></span>年<span id="month"></span>月<span id="day"></span>日</td>
+            </tr>
+            <tr>
+                <th>選択中の国</th>
+                <td>
+                    <input id="currentCountry" type="text" value="NotCountry">
+                </td>
+            </tr>
+            <tr>
+                <th>州の数</th>
+                <td id="numberStates"></td>
+            </tr>
+            <tr>
+                <th>補正値</th>
+                <td>
+                    <input id="currentCorrection" type="number">％
+                </td>
+            </tr>
+            <tr>
+                <th>軍事力</th>
+                <td id="mil"></td>
+            </tr>
+        </table>
+        <input id="idAddStates" type="button" value="州追加モードに変更" onclick="addStates();" disabled>
+        <input id="idModify" type="button" value="情報を修正（未実装）" onclick="modify();" disabled>
+    </form>
+    <form style="float: left;">
+        <table>
+            <tr>
+                <th>国名</th>
+                <td>
+                    <input id="countryName" type="text" value="半角英数のみ、「,」は使用禁止" style="width: 16em">
+                </td>
+            </tr>
+            <tr>
+                <th>国の色</th>
+                <td>
+                    <input id="R" type="number" value="0" min="0" max="255">
+                    <input id="G" type="number" value="0" min="0" max="255">
+                    <input id="B" type="number" value="0" min="0" max="255">
+                </td>
+            </tr>
+            <tr>
+                <th>軍事力補正</th>
+                <td>
+                    <input id="correction" type="number" value="100" min="0" max="1000">％
+                </td>
+            </tr>
+        </table>
+        <input id="idMakeCountry" type="button" value="国を作成" onclick="makeCountry();" disabled>
+    </form>
+    <a href="https://www.colorfulbox.jp/rd.php?aid=a5b5a809166ed7" target="_blank" rel="nofollow">
+        <img alt="カラフルボックス" src="https://www.colorfulbox.jp/common/img/bnr/colorfulbox_bnr01.png" style="height: 100px;">
+    </a>
+    <script>
+        var map = document.getElementById('map');
+        var canvas = document.getElementById("myCanvas");
+        var ctx = canvas.getContext("2d");
+        var dCountryNames = document.getElementById("countryNames");
+        doResize();
+        addStatesMode = 0;
+        getDate();
+
+        map.onload = function () {
+            //キャンバスの初期設定
+            canvas.width = map.width;
+            canvas.height = map.height;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(map, 0, 0);
+            provinceImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            politicalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            //updateMap(0, 0, politicalImageData.width, politicalImageData.height);
+
+            //国名配置
+            dCountryNames.setAttribute("height", canvas.height);
+            dCountryNames.setAttribute("width", canvas.width);
+            let csv = csvToArray("countries.csv?=" + Math.random());
+            for (let j = 1; j < csv.length; j++)
+                dCountryNames.innerHTML += "<div style=\"position: absolute; left:" + csv[j][1] * MapPrintRatio + "px; top:" + csv[j][2] * MapPrintRatio + "px; font-size: " + csv[j][3] + "px; width: 100%\">" + csv[j][0] + "</div>";
+        }
+
+        function doResize() {
+            //var MapPrintWidth = window.outerWidth - 16;
+            //MapPrint.setAttribute("width", MapPrintWidth);
+            //MapPrintRatio = 5632 / MapPrintWidth;
+            MapPrintRatio = 1;
+            //window.outerWidth ブラウザ外周の横幅 screen.availWidth スクリーン横幅
+        }
+
+        function csvToArray(path) { //CSVを配列に
+            var csvData = new Array();
+            var data = new XMLHttpRequest();
+            data.open("GET", path, false);
+            data.send(null);
+            var LF = String.fromCharCode(10);
+            var lines = data.responseText.split(LF);
+            for (let i = 0; i < lines.length; ++i) {
+                let cells = lines[i].split(",");
+                if (cells.length != 1) {
+                    csvData.push(cells);
+                }
+            }
+            return csvData;
+        }
+
+        function getDate() {
+            var xmlhttp = createXmlHttpRequest();
+            if (xmlhttp != null) {
+                xmlhttp.open("POST", "admin.php", false);
+                xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                var data = "data=" + "getDate,a";
+                xmlhttp.send(data);
+                var result = xmlhttp.responseText;
+                result = result.split(",");
+                if (result[0] == "Failed") alert(result[1]);
+                document.getElementById("year").innerHTML = result[0];
+                document.getElementById("month").innerHTML = result[1];
+                document.getElementById("day").innerHTML = result[2];
+            } else alert("PHPファイルとの通信に失敗しました");
+        }
+
+        canvas.onclick = function (evt) { //マウスクリック時
+            ctx.putImageData(politicalImageData, 0, 0);
+            x = parseInt(evt.offsetX);
+            y = parseInt(evt.offsetY);
+            var dataOffset = (x + y * provinceImageData.width) * 4;
+            var mouseColorR = provinceImageData.data[dataOffset];
+            var mouseColorG = provinceImageData.data[dataOffset + 1];
+            var mouseColorB = provinceImageData.data[dataOffset + 2];
+            if (mouseColorR == 100 && mouseColorG == 100 && mouseColorB == 100) alert("境界線です"); //境界線選択を無効化
+            else {
+                var xmlhttp = createXmlHttpRequest();
+                if (xmlhttp != null) {
+                    xmlhttp.open("POST", "admin.php", false);
+                    xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                    if (addStatesMode == 0) { //州追加モードではない場合
+                        var data = "data=" + "selectProvince," + x * MapPrintRatio + "," + y * MapPrintRatio;
+                        xmlhttp.send(data);
+                        var result = xmlhttp.responseText;
+                        result = result.split(",");
+                        if (result[0] == "Failed") alert(result[1]);
+                        document.getElementById("currentCountry").value = result[1];
+                        document.getElementById("flag").src = "flags/" + result[1] + ".png";
+                        document.getElementById("numberStates").innerHTML = result[2];
+                        document.getElementById("currentCorrection").value = result[3];
+                        document.getElementById("mil").innerHTML = Math.round(result[2] ** 0.5 * result[3] / 100);
+                        //document.getElementById("map").src = "tempMap.png?r=" + Math.random(); 色塗り処理は停止
+                        currentCountryColorR = result[4];
+                        currentCountryColorG = result[5];
+                        currentCountryColorB = result[6];
+                        if (result[1] == "NotCountry") { //境界線や海では国をつくれないし州も追加できない
+                            document.getElementById('idMakeCountry').disabled = true;
+                            document.getElementById('idAddStates').disabled = true;
+                        } else if (result[1] == "NML") { //無主地では国は作れるが州は追加できない
+                            document.getElementById('idMakeCountry').disabled = false;
+                            document.getElementById('idAddStates').disabled = true;
+                        } else { //国が選択されていればそこに国をつくれるし州も追加できる
+                            document.getElementById('idMakeCountry').disabled = false; //だが既存の国が領有している州にまだ国をつくれない
+                            document.getElementById('idAddStates').disabled = false;
+                        }
+                    } else { //州追加モードの場合
+                        var data = "data=" + "addStates," + x * MapPrintRatio + "," + y * MapPrintRatio + "," + currentCountryColorR + "," + currentCountryColorG + "," + currentCountryColorB;
+                        xmlhttp.send(data);
+                        var result = xmlhttp.responseText;
+                        result = result.split(",");
+                        if (result[0] == "Failed") alert(result[1]);
+                        document.getElementById("map").src = "map.png?r=" + Math.random();
+                        document.getElementById("numberStates").innerHTML = "編集中";
+                        document.getElementById("mil").innerHTML = "編集中";
+                    }
+                } else alert("PHPファイルとの通信に失敗しました");
+            }
+        }
+
+        function makeCountry() { //国を作成
+            //if (document.getElementById("countryName").value.match(/[^A-Z^a-z\d\-]/)) {
+            //    alert("国名には半角英数字しか使えません");
+            //} else {
+            var xmlhttp = createXmlHttpRequest();
+            if (xmlhttp != null) {
+                xmlhttp.open("POST", "admin.php", false);
+                xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                var data = "data=" + "makeCountry," + x * MapPrintRatio + "," + y * MapPrintRatio + "," + document.getElementById("countryName").value + "," + document.getElementById("R").value + "," + document.getElementById("G").value + "," + document.getElementById("B").value + "," + document.getElementById("correction").value;
+                xmlhttp.send(data);
+                var result = xmlhttp.responseText;
+                result = result.split(",");
+                if (result[0] == "Failed") alert(result[1]);
+                document.getElementById("map").src = "map.png?r=" + Math.random();
+                document.getElementById('idMakeCountry').disabled = true;
+            } else alert("PHPファイルとの通信に失敗しました");
+            //}
+        }
+
+        function modify() { //国の情報を修正
+        }
+
+        function addStates() { //州追加モードの切り替え
+            if (addStatesMode == 0) { //州追加モードに切り替えるとき
+                addStatesMode = 1;
+                document.getElementById('idAddStates').value = "州追加モードを終了";
+                document.getElementById('idMakeCountry').disabled = true;
+                document.getElementById("map").src = "map.png?r=" + Math.random();
+            } else { //通常モードに切り替えるとき
+                addStatesMode = 0;
+                document.getElementById('idAddStates').value = "州追加モードに変更";
+            }
+
+        }
+
+        function createXmlHttpRequest() { //PHPとデータを送受信するところ
+            var xmlhttp = null;
+            if (window.ActiveXObject) {
+                try {
+                    xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+                }
+                catch (e) {
+                    try {
+                        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+                    }
+                    catch (e2) {
+                    }
+                }
+            }
+            else if (window.XMLHttpRequest) {
+                xmlhttp = new XMLHttpRequest();
+            }
+            return xmlhttp;
+        }
+    </script>
+</body>
+
+</html>

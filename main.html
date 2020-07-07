@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>架空国家第五世界線</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body style="margin: 0px !important;">
+    <img id="map">
+    <div id="countryNames" style="position:absolute; top:0px;left:0px;"></div>
+    <img id="currentCountryFlag" src="flags/NotCountry.png" style="float: left;" width="256px">
+    <table style="float: left;">
+        <tr>
+            <th>現在の日時</th>
+            <td><span id="year"></span>年<span id="month"></span>月<span id="day"></span>日</td>
+        </tr>
+        <tr>
+            <th>操作中の国</th>
+            <td id="currentCountryName">NotCountry</td>
+        </tr>
+        <tr>
+            <th>州の数</th>
+            <td id="currentCountryNumberStates"></td>
+        </tr>
+        <tr>
+            <th>軍事力</th>
+            <td id="currentCountryMil"></td>
+        </tr>
+    </table>
+    <img id="targetCountryFlag" src="flags/NotCountry.png" style="float: left;" width="256px">
+    <table style="float: left;">
+        <tr>
+            <th>選択中の国</th>
+            <td id="targetCountryName"></td>
+        </tr>
+        <tr>
+            <th>州の数</th>
+            <td id="targetCountryNumberStates"></td>
+        </tr>
+        <tr>
+            <th>軍事力</th>
+            <td id="targetCountryMil"></td>
+        </tr>
+        <tr>
+            <th>関係</th>
+            <td id="relation"></td>
+        </tr>
+        <tr>
+            <th>要求可能州数</th>
+            <td id="demands"></td>
+        </tr>
+    </table>
+    <form method="POST" style="float: left; height: 170px;">
+        <input type="button" value="国を選択" onclick="selectCountry();"><br>
+        <input id="idDeclareWar" type="button" value="宣戦布告" onclick="declareWar();" disabled><br>
+        <input id="idDemandState" type="button" value="この州を要求" onclick="demandState();" disabled>
+    </form>
+    <iframe id="news" src="news.txt" height="80px">
+        この部分はインラインフレームを使用しています。
+    </iframe><br>
+    <a href="https://www.colorfulbox.jp/rd.php?aid=a5b5a809166ed7" target="_blank" rel="nofollow">
+        <img alt="カラフルボックス" src="https://www.colorfulbox.jp/common/img/bnr/colorfulbox_bnr01.png" style="height: 80px;">
+    </a>
+    <script>
+        doResize();
+        document.getElementById("map").src = "map.png?r=" + Math.random();
+        document.getElementById("news").src = "news.txt?r=" + Math.random();
+        addStatesMode = 0;
+        getDate();
+        currentCountryColorR = 0;
+        currentCountryColorG = 0;
+        currentCountryColorB = 0;
+        demandStateMode = 0;
+        i = 0;
+
+        //国名配置
+
+        let csv = csvToArray("countries.csv");
+        for (let j = 1; j < csv.length; j++)
+            document.getElementById("countryNames").innerHTML += "<div style=\"position: absolute; left:" + csv[j][1] * MapPrintRatio + "px; top:" + csv[j][2] * MapPrintRatio + "px; font-size: " + csv[j][3] + "; width: 100%\">" + csv[j][0] + "</div>";
+
+
+        window.onresize = function () { //リサイズ時に実行
+            doResize();
+        };
+
+        function doResize() {
+            var MapPrint = document.getElementById('map');
+            var MapPrintWidth = window.outerWidth - 16;
+            MapPrint.setAttribute("width", MapPrintWidth);
+            MapPrintRatio = 5616 / MapPrintWidth;
+            //window.outerWidth ブラウザ外周の横幅 screen.availWidth スクリーン横幅
+        }
+
+        function csvToArray(path) { //CSVを配列に
+            var csvData = new Array();
+            var data = new XMLHttpRequest();
+            data.open("GET", path, false);
+            data.send(null);
+            var LF = String.fromCharCode(10);
+            var lines = data.responseText.split(LF);
+            for (let i = 0; i < lines.length; ++i) {
+                let cells = lines[i].split(",");
+                if (cells.length != 1) {
+                    csvData.push(cells);
+                }
+            }
+            return csvData;
+        }
+
+        function getDate() {
+            var xmlhttp = createXmlHttpRequest();
+            if (xmlhttp != null) {
+                xmlhttp.open("POST", "main.php", false);
+                xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                var data = "data=" + "getDate,a";
+                xmlhttp.send(data);
+                var result = xmlhttp.responseText;
+                result = result.split(",");
+                if (result[0] == "Failed") alert(result[1]);
+                document.getElementById("year").innerHTML = result[0];
+                document.getElementById("month").innerHTML = result[1];
+                document.getElementById("day").innerHTML = result[2];
+            } else alert("PHPファイルとの通信に失敗しました");
+        }
+
+        var map = document.getElementById("map");
+        map.onclick = function (evt) { //マウス位置を送信して結果を反映
+            mouseX = parseInt(evt.offsetX);
+            mouseY = parseInt(evt.offsetY);
+            var xmlhttp = createXmlHttpRequest();
+            if (xmlhttp != null) {
+                xmlhttp.open("POST", "main.php", false);
+                xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                var data = "data=" + "selectProvince," + mouseX * MapPrintRatio + "," + mouseY * MapPrintRatio + "," + currentCountryColorR + "." + currentCountryColorG + "." + currentCountryColorB;
+                xmlhttp.send(data);
+                var result = xmlhttp.responseText;
+                result = result.split(",");
+                if (result[0] == "Failed") alert(result[1]);
+                document.getElementById("targetCountryName").innerHTML = result[0];
+                document.getElementById("targetCountryFlag").src = "flags/" + result[0] + ".png";
+                document.getElementById("targetCountryNumberStates").innerHTML = result[1];
+                document.getElementById("targetCountryMil").innerHTML = Math.round(result[1] ** 0.5 * result[2] / 100);
+                document.getElementById("demands").innerHTML = result[7];
+                targetCountryColorR = result[3];
+                targetCountryColorG = result[4];
+                targetCountryColorB = result[5];
+                if (document.getElementById("currentCountryName").innerHTML == "NotCountry" || result[0] == "NotCountry" || result[0] == "NML") { //自国が選択されていないか選択国が国でないか無主地の時
+                    document.getElementById("idDeclareWar").disabled = true;
+                    document.getElementById("idDemandState").disabled = true;
+                    document.getElementById("relation").innerHTML = "なし";
+                } else {
+                    if (document.getElementById("currentCountryName").innerHTML == document.getElementById("targetCountryName").innerHTML) {//自国を選択している時
+                        document.getElementById("idDeclareWar").disabled = true;
+                        document.getElementById("idDemandState").disabled = true;
+                        document.getElementById("relation").innerHTML = "なし";
+                    } else if (result[6] == 0) { //選択国と戦争してない時
+                        document.getElementById("idDeclareWar").disabled = false;
+                        document.getElementById("relation").innerHTML = "中立";
+                        if (result[7] > 0) document.getElementById("idDemandState").disabled = false; //要求が0より大きいとき
+                        else document.getElementById("idDemandState").disabled = true;
+                    } else { //選択国と戦争中のとき
+                        document.getElementById("idDeclareWar").disabled = true;
+                        document.getElementById("idDemandState").disabled = true;
+                        document.getElementById("relation").innerHTML = "戦争！";
+                    }
+                }
+            } else alert("PHPファイルとの通信に失敗しました");
+        }
+
+
+        function selectCountry() {
+            if (document.getElementById("targetCountryName").innerHTML == "NotCountry") alert("国でないものは選択できません");
+            else if (document.getElementById("targetCountryName").innerHTML == "NML") alert("無主地は選択できません");
+            else {
+                document.getElementById("currentCountryName").innerHTML = document.getElementById("targetCountryName").innerHTML;
+                document.getElementById("currentCountryFlag").src = document.getElementById("targetCountryFlag").src;
+                document.getElementById("currentCountryNumberStates").innerHTML = document.getElementById("targetCountryNumberStates").innerHTML;
+                document.getElementById("currentCountryMil").innerHTML = document.getElementById("targetCountryMil").innerHTML;
+                currentCountryColorR = targetCountryColorR;
+                currentCountryColorG = targetCountryColorG;
+                currentCountryColorB = targetCountryColorB;
+            }
+        }
+
+        function declareWar() {
+            if (document.getElementById("targetCountryName").innerHTML == "NotCountry") alert("国でないものには宣戦布告できません");
+            else if (document.getElementById("targetCountryName").innerHTML == "NML") alert("無主地には宣戦布告出来ません");
+            else if (document.getElementById("currentCountryName").innerHTML == document.getElementById("targetCountryName").innerHTML) alert("自国には宣戦布告できません");
+            else {
+                var xmlhttp = createXmlHttpRequest();
+                if (xmlhttp != null) {
+                    xmlhttp.open("POST", "main.php", false);
+                    xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                    var data = "data=" + "declareWar," + currentCountryColorR + "." + currentCountryColorG + "." + currentCountryColorB + "," + targetCountryColorR + "." + targetCountryColorG + "." + targetCountryColorB + "," + document.getElementById("year").innerHTML + "," + document.getElementById("month").innerHTML + "," + document.getElementById("day").innerHTML + "," + document.getElementById("currentCountryName").innerHTML + "," + document.getElementById("targetCountryName").innerHTML;
+                    xmlhttp.send(data);
+                    var result = xmlhttp.responseText;
+                    result = result.split(",");
+                    if (result[0] == "Failed") alert(result[1]);
+                    document.getElementById("idDeclareWar").disabled = true;
+                } else alert("PHPファイルとの通信に失敗しました");
+            }
+        }
+
+        function demandState() {
+            var xmlhttp = createXmlHttpRequest();
+            if (xmlhttp != null) {
+                xmlhttp.open("POST", "main.php", false);
+                xmlhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+                var data = "data=" + "demandState," + mouseX * MapPrintRatio + "," + mouseY * MapPrintRatio + "," + currentCountryColorR + "," + currentCountryColorG + "," + currentCountryColorB + "," + document.getElementById("demands").innerHTML;
+                xmlhttp.send(data);
+                var result = xmlhttp.responseText;
+                result = result.split(",");
+                if (result[0] == "Failed") alert(result[1]);
+                else document.getElementById("map").src = "map.png?r=" + Math.random();
+            } else alert("PHPファイルとの通信に失敗しました");
+        }
+
+        function createXmlHttpRequest() { //PHPとデータを送受信するところ
+            var xmlhttp = null;
+            if (window.ActiveXObject) {
+                try {
+                    xmlhttp = new ActiveXObject("Msxml2.XMLHTTP");
+                }
+                catch (e) {
+                    try {
+                        xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+                    }
+                    catch (e2) {
+                    }
+                }
+            }
+            else if (window.XMLHttpRequest) {
+                xmlhttp = new XMLHttpRequest();
+            }
+            return xmlhttp;
+        }
+    </script>
+</body>
+
+</html>
